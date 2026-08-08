@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bayertap"
+version = "0.1.0"
+description = "Passive conformance tap for bayerlink links: capture, decode, judge"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Serge Rabyking" }]
+requires-python = ">=3.9"
+keywords = ["bayer", "raw", "hdmi", "capture", "v4l2", "fpga", "conformance", "tc358743"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Video :: Capture",
+    "Topic :: Software Development :: Embedded Systems",
+]
+dependencies = ["numpy", "bayerlink>=0.2.0"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/bayerlink/bayertap"
+Source = "https://github.com/bayerlink/bayertap"
+Issues = "https://github.com/bayerlink/bayertap/issues"
+
+[project.scripts]
+bayertap = "bayertap.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["bayertap*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
