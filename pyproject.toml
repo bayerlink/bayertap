@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bayertap"
-version = "0.1.0"
+version = "0.2.0"
 description = "Passive conformance tap for bayerlink links: capture, decode, judge"
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Multimedia :: Video :: Capture",
     "Topic :: Software Development :: Embedded Systems",
 ]
-dependencies = ["numpy", "bayerlink>=0.2.0"]
+dependencies = ["numpy", "bayerlink>=0.3.0"]
 
 [project.optional-dependencies]
 test = ["pytest"]

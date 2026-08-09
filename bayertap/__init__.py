@@ -6,4 +6,9 @@ capture device carrying a bayerlink source and it tells you whether the
 bytes survive. It judges with the same published codec the source encoded
 with, so the two ends cannot disagree about what conformance means.
 """
-__version__ = "0.1.0"
+# The one version statement is pyproject.toml; this reads it.
+from importlib.metadata import version as _version
+try:
+    __version__ = _version("bayertap")
+except Exception:
+    __version__ = "unknown"
