@@ -47,6 +47,17 @@ For the TC358743 tier, remember the bridge needs an EDID loaded
 is what the source reads, so advertise only RGB 4:4:4 at your one mode and
 the source is steered into the only format the protocol accepts.
 
+## No Linux box on the bench
+
+The capture side is V4L2, but the stick does not care what it plugs into:
+[`contrib/macgrab.py`](contrib/macgrab.py) grabs frames on macOS through
+ffmpeg/AVFoundation and writes the same `.npy` that `--from-file` consumes —
+
+```sh
+python3 contrib/macgrab.py --device 0 --mode tunnel --out grab.npy
+bayertap check --via tunnel --from-file grab.npy --expect counting
+```
+
 ## Status
 
 Everything except the ioctl layer is proven off-target: struct sizes pinned
