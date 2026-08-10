@@ -66,6 +66,18 @@ with pilot learning) tested end-to-end from files. First runs against real
 capture silicon are the bench session; the known-good device table starts
 there.
 
+## Funding
+
+Developed independently; recurring support via
+[github.com/sponsors/lanserge](https://github.com/sponsors/lanserge), or write
+first: **s.rabykin@gmail.com**. Sponsorable capability targets carry the
+`sponsorable` label on the issue tracker — currently
+[DNG and bare-mosaic bridges](https://github.com/bayerlink/bayertap/issues/1)
+(every DNG camera and raw dataset as a source). Scope is agreed in writing
+before work starts; sponsored work lands in the open tree immediately, MIT
+like everything else — sponsorship buys ordering and named credit, not
+exclusivity.
+
 ## Licence
 
 MIT.
