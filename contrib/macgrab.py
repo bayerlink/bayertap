@@ -11,6 +11,10 @@ that ``bayertap check --from-file`` consumes:
     direct mode:  (height, width, 3) uint8 -- RGB, for sticks whose pipeline
                                              is transparent
 
+With ``--frames N`` (N > 1) the file is a RECORDING: the same arrays
+stacked on a leading axis, which bayertap's --from-file replays frame by
+frame.
+
 Usage, MS2109 + luma tunnel (the common cheap-stick bench):
 
     python3 macgrab.py --list                 # find the stick's device index
@@ -43,14 +47,14 @@ def list_devices() -> int:
 
 
 def grab(device: str, size: tuple[int, int], fps: int, mode: str,
-         skip: int) -> np.ndarray:
+         skip: int, frames: int = 1) -> np.ndarray:
     width, height = size
     out_fmt = "gray" if mode == "tunnel" else "rgb24"
     last_error = ""
     for pixel_format in CANDIDATE_FORMATS:
         with tempfile.NamedTemporaryFile(suffix=".raw") as raw:
-            # -frames skips warm-up frames: sticks need a few frames to
-            # lock; the LAST grabbed frame is the one kept.
+            # skip discards warm-up frames -- sticks need a few to lock --
+            # then the LAST `frames` grabbed are the ones kept.
             command = [
                 "ffmpeg", "-hide_banner", "-loglevel", "error",
                 "-f", "avfoundation",
@@ -58,7 +62,7 @@ def grab(device: str, size: tuple[int, int], fps: int, mode: str,
                 "-video_size", f"{width}x{height}",
                 "-pixel_format", pixel_format,
                 "-i", device,
-                "-frames:v", str(skip + 1),
+                "-frames:v", str(skip + frames),
                 "-f", "rawvideo", "-pix_fmt", out_fmt,
                 "-y", raw.name,
             ]
@@ -70,14 +74,15 @@ def grab(device: str, size: tuple[int, int], fps: int, mode: str,
             data = np.fromfile(raw.name, dtype=np.uint8)
             channels = 1 if mode == "tunnel" else 3
             frame_size = width * height * channels
-            if data.size < frame_size:
+            if data.size < frame_size * frames:
                 last_error = (f"{pixel_format}: ffmpeg wrote {data.size} bytes,"
-                              f" one frame needs {frame_size}")
+                              f" {frames} frame(s) need {frame_size * frames}")
                 continue
-            frame = data[-frame_size:]          # the last (settled) frame
-            if mode == "tunnel":
-                return frame.reshape(height, width)
-            return frame.reshape(height, width, 3)
+            kept = data[-frame_size * frames:]
+            shape = (frames, height, width) if mode == "tunnel" else \
+                (frames, height, width, 3)
+            stack = kept.reshape(shape)
+            return stack[0] if frames == 1 else stack
     raise SystemExit(
         f"no candidate pixel format worked; last error: {last_error}\n"
         "Run with --list to check the device index, and confirm the stick "
@@ -97,14 +102,18 @@ def main(argv=None) -> int:
     parser.add_argument("--mode", choices=["tunnel", "direct"],
                         default="tunnel")
     parser.add_argument("--skip", type=int, default=5,
-                        help="warm-up frames to discard before keeping one")
+                        help="warm-up frames to discard before keeping any")
+    parser.add_argument("--frames", type=int, default=1,
+                        help="frames to keep; more than 1 writes a stacked "
+                             "recording bayertap can replay")
     parser.add_argument("--out", default="grab.npy")
     args = parser.parse_args(argv)
 
     if args.list:
         return list_devices()
 
-    frame = grab(args.device, args.size, args.fps, args.mode, args.skip)
+    frame = grab(args.device, args.size, args.fps, args.mode, args.skip,
+                 frames=args.frames)
     np.save(args.out, frame)
     print(f"wrote {args.out}: shape {frame.shape}, "
           f"min {frame.min()}, max {frame.max()}")

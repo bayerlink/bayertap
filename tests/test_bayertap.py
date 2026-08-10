@@ -70,9 +70,9 @@ def test_check_applies_the_lane_map(tmp_path, capsys):
 
 
 def test_check_from_file_via_tunnel(tmp_path, capsys):
-    display = (192, 40)
+    display = (660, 40)
     inner_w, inner_h = tunnel.inner_display(*display)
-    raw = pattern.generate("counting", inner_w * 2, 20)
+    raw = pattern.generate("counting", inner_w * 2 - 2, 20)
     container = encode_frame(raw, "BGGR", frame_seq=0,
                              display=(inner_w, inner_h),
                              flags=FLAG_TEST_PATTERN)
@@ -82,3 +82,22 @@ def test_check_from_file_via_tunnel(tmp_path, capsys):
     code = cli.main(["--from-file", str(path), "--via", "tunnel",
                      "check", "--pattern", "counting"])
     assert code == 0 and "1 good, 0 bad" in capsys.readouterr().out
+
+
+def test_a_recording_replays_frame_by_frame(tmp_path, capsys):
+    """A stacked .npy is a stream: each frame checked, repeats deduped."""
+    display = (660, 40)
+    inner_w, inner_h = tunnel.inner_display(*display)
+    raw = pattern.generate("counting", inner_w * 2 - 2, 20)
+    lumas = []
+    for seq in (0, 0, 1, 2):                     # a scanout repeat included
+        container = encode_frame(raw, "BGGR", frame_seq=seq,
+                                 display=(inner_w, inner_h),
+                                 flags=FLAG_TEST_PATTERN)
+        lumas.append(tunnel.encode(container, display)[:, :, 0])
+    path = tmp_path / "recording.npy"
+    np.save(path, np.stack(lumas))
+    code = cli.main(["--from-file", str(path), "--via", "tunnel",
+                     "check", "--pattern", "counting"])
+    out = capsys.readouterr().out
+    assert code == 0 and "3 good, 0 bad" in out

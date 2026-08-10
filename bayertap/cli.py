@@ -60,16 +60,32 @@ def _validate(container: np.ndarray, expect_pattern: str | None,
 
 
 def _containers(args):
-    """Yield (tag, container) from the device or the file, per --via."""
+    """Yield (tag, container) from the device or the file, per --via.
+
+    A file is one physical frame or a RECORDING -- the same arrays with a
+    leading frame axis (see contrib/macgrab.py --frames, and `save`):
+    tunnel luma is (h, w) or (n, h, w); direct RGB / saved containers are
+    (h, w, 3) or (n, h, w, 3). A recording replays frame by frame.
+    """
     if args.from_file:
-        physical = np.load(args.from_file)
+        physical = np.load(args.from_file, mmap_mode="r")
         if args.via == "tunnel":
-            luma = physical[:, :, 0] if physical.ndim == 3 else physical
-            _, inner_h = tunnel.inner_display(luma.shape[1], luma.shape[0])
-            yield 0, tunnel.decode(luma, inner_height=inner_h)
+            single = physical.ndim == 2 or (
+                physical.ndim == 3 and physical.shape[-1] == 3)
+            stack = physical[None] if single else physical
+            for tag, item in enumerate(stack):
+                luma = item[:, :, 0] if item.ndim == 3 else item
+                _, inner_h = tunnel.inner_display(luma.shape[1],
+                                                  luma.shape[0])
+                try:
+                    yield tag, tunnel.decode(np.asarray(luma),
+                                             inner_height=inner_h)
+                except ValueError as error:
+                    yield tag, error
         else:
-            frame = physical[:, :, list(args.lane_map)]
-            yield 0, frame
+            stack = physical[None] if physical.ndim == 3 else physical
+            for tag, item in enumerate(stack):
+                yield tag, np.asarray(item)[:, :, list(args.lane_map)]
         return
 
     from . import v4l2
@@ -123,9 +139,13 @@ def main(argv=None) -> int:
     sub.add_parser("probe", help="resolve the byte-lane permutation "
                                  "(direct capture of one frame)")
 
-    save = sub.add_parser("save", help="write decoded raw frames as .npy")
-    save.add_argument("--out", required=True)
-    save.add_argument("--frames", type=int, default=1)
+    save = sub.add_parser(
+        "save", help="record CONTAINERS as one stacked .npy -- the full "
+                     "wire bytes, headers included, replayable through "
+                     "--from-file and through picam2hdmi --source file")
+    save.add_argument("--out", required=True, help="output .npy path")
+    save.add_argument("--frames", type=int, default=1,
+                      help="NEW frames to record (deduplicated by seq)")
 
     args = parser.parse_args(argv)
 
@@ -147,6 +167,7 @@ def main(argv=None) -> int:
 
     seen = last_seq = None
     good = bad = saved = 0
+    recorded = []
     for tag, container in _containers(args):
         if isinstance(container, Exception):
             bad += 1
@@ -164,11 +185,9 @@ def main(argv=None) -> int:
             good += 1
             last_seq = header.frame_seq
             if args.command == "save":
-                _, raw = decode_frame(container)
-                path = f"{args.out.rstrip('/')}/frame_{header.frame_seq:08d}.npy"
-                np.save(path, raw)
+                recorded.append(np.asarray(container, dtype=np.uint8))
                 saved += 1
-                print(f"saved {path}")
+                print(f"recorded frame {saved} (seq {header.frame_seq})")
             elif good % 30 == 1:
                 print(f"[{tag}] ok: {header.fourcc} {header.width}x"
                       f"{header.height} seq {header.frame_seq}"
@@ -177,6 +196,13 @@ def main(argv=None) -> int:
         limit = getattr(args, "frames", 0)
         if limit and (good if args.command == "check" else saved) >= limit:
             break
+
+    if args.command == "save" and recorded:
+        stack = np.stack(recorded)
+        np.save(args.out, stack)
+        print(f"wrote {args.out}: {stack.shape} -- containers, headers "
+              "included; replayable via --from-file or picam2hdmi "
+              "--source file")
 
     print(f"\n{good} good, {bad} bad")
     return 0 if bad == 0 and good > 0 else 1
