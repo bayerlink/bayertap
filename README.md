@@ -76,7 +76,8 @@ first: **s.rabykin@gmail.com**. Sponsorable capability targets carry the
 (every DNG camera and raw dataset as a source). Scope is agreed in writing
 before work starts; sponsored work lands in the open tree immediately, MIT
 like everything else — sponsorship buys ordering and named credit, not
-exclusivity.
+exclusivity. The person behind it:
+[serge.rabyking.com](https://serge.rabyking.com).
 
 ## Licence
 
