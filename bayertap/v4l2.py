@@ -10,7 +10,7 @@ This layer knows nothing about bayerlink. It negotiates a pixel format,
 maps buffers, and yields frames; what the frames MEAN belongs to the
 caller. That split is what lets one tool serve every capture tier -- a
 TC358743 bridge delivering RGB888, an S-variant USB3 stick delivering
-RGB24, an MS2109 delivering YUY2 for the luma tunnel -- they are all just
+RGB24, and other bridges deliver other layouts -- they are all just
 V4L2 devices with different formats.
 """
 from __future__ import annotations
@@ -114,7 +114,7 @@ def frame_array(data: np.ndarray, pixelformat: int, width: int,
     """Raw captured bytes -> a channel-shaped array, per format.
 
     YUYV yields the LUMA plane (height, width) -- the only channel the luma
-    tunnel needs, extracted here so callers never index interleaved bytes.
+    callers need, extracted here so they never index interleaved bytes.
     RGB3/BGR3 yield (height, width, 3) in MEMORY byte order, untouched:
     which byte is which lane is detect_lane_map()'s question, not this
     layer's.
@@ -126,7 +126,7 @@ def frame_array(data: np.ndarray, pixelformat: int, width: int,
         return rows[:, :width * 3].reshape(height, width, 3).copy()
     raise ValueError(
         f"unhandled pixelformat {pixelformat:#010x}; this tool captures "
-        "YUYV (luma tunnel) and RGB3/BGR3 (direct), and refuses MJPEG "
+        "YUYV and RGB3/BGR3, and refuses MJPEG "
         "outright -- lossy compression cannot carry a byte container.")
 
 

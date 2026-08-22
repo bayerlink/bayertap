@@ -7,7 +7,7 @@ import ctypes
 
 import numpy as np
 import pytest
-from bayerlink import encode_frame, pattern, tunnel
+from bayerlink import encode_frame, pattern
 from bayerlink.protocol import FLAG_TEST_PATTERN
 
 from bayertap import cli, v4l2
@@ -69,35 +69,19 @@ def test_check_applies_the_lane_map(tmp_path, capsys):
                      "check", "--pattern", "corners"]) == 0
 
 
-def test_check_from_file_via_tunnel(tmp_path, capsys):
-    display = (660, 40)
-    inner_w, inner_h = tunnel.inner_display(*display)
-    raw = pattern.generate("counting", inner_w * 2 - 2, 20)
-    container = encode_frame(raw, "BGGR", frame_seq=0,
-                             display=(inner_w, inner_h),
-                             flags=FLAG_TEST_PATTERN)
-    grey = tunnel.encode(container, display)
-    path = tmp_path / "tunnel.npy"
-    np.save(path, grey)
-    code = cli.main(["--from-file", str(path), "--via", "tunnel",
-                     "check", "--pattern", "counting"])
-    assert code == 0 and "1 good, 0 bad" in capsys.readouterr().out
-
 
 def test_a_recording_replays_frame_by_frame(tmp_path, capsys):
     """A stacked .npy is a stream: each frame checked, repeats deduped."""
-    display = (660, 40)
-    inner_w, inner_h = tunnel.inner_display(*display)
-    raw = pattern.generate("counting", inner_w * 2 - 2, 20)
-    lumas = []
+    display = (64, 21)
+    raw = pattern.generate("counting", 64, 20)
+    frames = []
     for seq in (0, 0, 1, 2):                     # a scanout repeat included
-        container = encode_frame(raw, "BGGR", frame_seq=seq,
-                                 display=(inner_w, inner_h),
-                                 flags=FLAG_TEST_PATTERN)
-        lumas.append(tunnel.encode(container, display)[:, :, 0])
+        frames.append(encode_frame(raw, "BGGR", frame_seq=seq,
+                                   display=display,
+                                   flags=FLAG_TEST_PATTERN))
     path = tmp_path / "recording.npy"
-    np.save(path, np.stack(lumas))
-    code = cli.main(["--from-file", str(path), "--via", "tunnel",
+    np.save(path, np.stack(frames))
+    code = cli.main(["--from-file", str(path),
                      "check", "--pattern", "counting"])
     out = capsys.readouterr().out
     assert code == 0 and "3 good, 0 bad" in out

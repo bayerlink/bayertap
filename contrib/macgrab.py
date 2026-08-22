@@ -3,23 +3,15 @@
 
 macOS has no V4L2, but a UVC capture stick shows up in AVFoundation, and
 ffmpeg can read it. This helper wraps the incantation and writes the .npy
-that ``bayertap check --from-file`` consumes:
-
-    tunnel mode:  (height, width) uint8   -- the luma plane, for MS2109-class
-                                             sticks feeding a --luma-tunnel
-                                             source
-    direct mode:  (height, width, 3) uint8 -- RGB, for sticks whose pipeline
-                                             is transparent
+that ``bayertap --from-file`` consumes: frames land as (height, width, 3)
+uint8 RGB, for sticks whose pipeline is transparent.
 
 With ``--frames N`` (N > 1) the file is a RECORDING: the same arrays
 stacked on a leading axis, which bayertap's --from-file replays frame by
 frame.
 
-Usage, MS2109 + luma tunnel (the common cheap-stick bench):
-
     python3 macgrab.py --list                 # find the stick's device index
-    python3 macgrab.py --device 0 --mode tunnel --out grab.npy
-    bayertap check --via tunnel --from-file grab.npy --expect counting
+    python3 macgrab.py --device 0 --out grab.npy
 
 Needs ffmpeg (brew install ffmpeg) and numpy. Nothing else.
 """
@@ -46,10 +38,10 @@ def list_devices() -> int:
     return 0
 
 
-def grab(device: str, size: tuple[int, int], fps: int, mode: str,
+def grab(device: str, size: tuple[int, int], fps: int,
          skip: int, frames: int = 1) -> np.ndarray:
     width, height = size
-    out_fmt = "gray" if mode == "tunnel" else "rgb24"
+    out_fmt = "rgb24"
     last_error = ""
     for pixel_format in CANDIDATE_FORMATS:
         with tempfile.NamedTemporaryFile(suffix=".raw") as raw:
@@ -72,15 +64,14 @@ def grab(device: str, size: tuple[int, int], fps: int, mode: str,
                     result.stderr.strip() else f"ffmpeg exit {result.returncode}"
                 continue
             data = np.fromfile(raw.name, dtype=np.uint8)
-            channels = 1 if mode == "tunnel" else 3
+            channels = 3
             frame_size = width * height * channels
             if data.size < frame_size * frames:
                 last_error = (f"{pixel_format}: ffmpeg wrote {data.size} bytes,"
                               f" {frames} frame(s) need {frame_size * frames}")
                 continue
             kept = data[-frame_size * frames:]
-            shape = (frames, height, width) if mode == "tunnel" else \
-                (frames, height, width, 3)
+            shape = (frames, height, width, 3)
             stack = kept.reshape(shape)
             return stack[0] if frames == 1 else stack
     raise SystemExit(
@@ -99,8 +90,6 @@ def main(argv=None) -> int:
                             int(v) for v in s.split("x")),
                         default=(1920, 1080), help="capture WxH")
     parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--mode", choices=["tunnel", "direct"],
-                        default="tunnel")
     parser.add_argument("--skip", type=int, default=5,
                         help="warm-up frames to discard before keeping any")
     parser.add_argument("--frames", type=int, default=1,
@@ -112,7 +101,7 @@ def main(argv=None) -> int:
     if args.list:
         return list_devices()
 
-    frame = grab(args.device, args.size, args.fps, args.mode, args.skip,
+    frame = grab(args.device, args.size, args.fps, args.skip,
                  frames=args.frames)
     np.save(args.out, frame)
     print(f"wrote {args.out}: shape {frame.shape}, "

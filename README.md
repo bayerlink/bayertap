@@ -12,7 +12,6 @@ about what conformance means.
 ```bash
 bayertap probe                          # which byte-lane permutation is this rig?
 bayertap --lane-map 2,1,0 check --pattern counting     # every sample, judged
-bayertap --via tunnel check --pattern counting          # through a cheap dongle
 bayertap --from-file frame.npy check    # no hardware at all
 ```
 
@@ -20,15 +19,9 @@ bayertap --from-file frame.npy check    # no hardware at all
 
 | Tier | Hardware | Path | Fidelity |
 | --- | --- | --- | --- |
-| **Trusted** | TC358743 HDMI→CSI-2 bridge (~$25, the PiKVM part) on any Pi or Jetson | `--via direct`, RGB888 | byte-exact |
-| **Cheap** | MS2130S / MS2131S USB3 stick (~$15) on any Linux box | `--via direct`, RGB24 | byte-exact **if** the stick's pipeline is transparent — `check` answers that in minutes |
-| **Drawer** | MS2109-class USB2 stick | `--via tunnel`, YUYV | **bit-exact at 1/6 capacity**, via the luma tunnel — run the source with `--luma-tunnel` |
-| Rejected | any USB2 stick, direct | MJPEG / starved YUYV | physics: USB2 cannot carry uncompressed 1080p, and MJPEG is lossy. Refused in code, not just here |
-
-The drawer tier deserves its sentence: a $10 dongle you already own becomes a
-working conformance receiver **today**, because bayerlink's luma tunnel
-carries the unchanged container as grey levels with a pilot line the decoder
-learns the channel from. Slow, and completely sufficient for proving bytes.
+| **Trusted** | TC358743 HDMI→CSI-2 bridge (~$25, the PiKVM part) on any Pi or Jetson | RGB888 (RGB3; `--bgr` for BGR3) | byte-exact |
+| **Cheap** | MS2130S / MS2131S USB3 stick (~$15) on any Linux box | RGB24 (RGB3) | byte-exact **if** the stick's pipeline is transparent — `check` answers that in minutes |
+| Rejected | any USB2 stick | MJPEG / starved YUYV | physics: USB2 cannot carry uncompressed 1080p, and MJPEG is lossy. Refused in code, not just here |
 
 ## The two bring-up commands
 
@@ -54,15 +47,15 @@ The capture side is V4L2, but the stick does not care what it plugs into:
 ffmpeg/AVFoundation and writes the same `.npy` that `--from-file` consumes —
 
 ```sh
-python3 contrib/macgrab.py --device 0 --mode tunnel --out grab.npy
-bayertap check --via tunnel --from-file grab.npy --expect counting
+python3 contrib/macgrab.py --device 0 --out grab.npy
+bayertap --from-file grab.npy check --pattern counting
 ```
 
 ## Status
 
 Everything except the ioctl layer is proven off-target: struct sizes pinned
-against the kernel uapi, both decode paths (direct with lane maps, tunnel
-with pilot learning) tested end-to-end from files. First runs against real
+against the kernel uapi, the decode path (direct capture with lane maps) tested end-to-end from
+files, recordings included. First runs against real
 capture silicon are the bench session; the known-good device table starts
 there.
 
