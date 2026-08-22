@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bayertap"
-version = "0.2.0"
+version = "0.2.1"
 description = "Passive conformance tap for bayerlink links: capture, decode, judge"
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,15 @@ classifiers = [
     "Topic :: Multimedia :: Video :: Capture",
     "Topic :: Software Development :: Embedded Systems",
 ]
-dependencies = ["numpy", "bayerlink>=0.3.0"]
+dependencies = ["numpy",
+    # The test patterns ARE the conformance contract: this tool
+    # regenerates the reference frame and compares it to what arrived,
+    # so it and the source must agree on what "counting" means, byte
+    # for byte. A floor below the version this is developed against
+    # would let a resolver pair a judge with a definition it does not
+    # share, and the failure reads as a bad link rather than a bad
+    # install.
+    "bayerlink>=0.5.0",]
 
 [project.optional-dependencies]
 test = ["pytest"]
